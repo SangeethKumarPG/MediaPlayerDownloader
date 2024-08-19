@@ -7,19 +7,11 @@ const path = require("path");
 const app = express();
 const port = 3000;
 
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://mediaplayerfrontend2.onrender.com");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  next();
-});
-
 app.get("/downloadVideo", async (req, res) => {
   const videoId = req.query.id;
   if (!videoId) {
     return res.status(400).send("Video ID is required");
   }
-  console.log(videoId);
   const videoOutput = `${videoId}videoOnly.mp4`;
   const audioOutput = `${videoId}.mp3`;
   const finalOutput = `${videoId}.mp4`;
@@ -35,7 +27,7 @@ app.get("/downloadVideo", async (req, res) => {
             console.log("Audio download complete");
             exec(
               `ffmpeg -i ${videoOutput} -i ${audioOutput} -c copy ${finalOutput}`,
-              (err, stdout, stderr) => {
+              (err) => {
                 if (err) {
                   console.error("Error merging video and audio:", err);
                   return res
@@ -53,46 +45,41 @@ app.get("/downloadVideo", async (req, res) => {
                 fileStream
                   .pipe(res)
                   .on("finish", () => {
-                    console.log("file sent successfully!!!");
+                    console.log("File sent successfully!");
                     fs.unlink(videoOutput, () => {});
                     fs.unlink(audioOutput, () => {});
                     fs.unlink(finalOutput, () => {});
                   })
                   .on("error", (err) => {
-                    console.log(err);
+                    console.error("Error sending file:", err);
                   });
               }
             );
           })
           .on("error", (error) => {
-            console.log(error);
-            return res.status(400).send("Unable to download audio");
+            console.error("Error downloading audio:", error);
+            res.status(400).send("Unable to download audio");
           });
       })
       .on("error", (error) => {
-        console.log(error);
-        return res.status(400).send("Video download error");
+        console.error("Error downloading video:", error);
+        res.status(400).send("Video download error");
       });
   } catch (error) {
-    console.log(error);
+    console.error("Error during download:", error);
     res.status(400).send("Error when downloading");
   }
 });
 
 app.get("/downloadAudio", async (req, res) => {
-  
-  console.log("Inside")
   const videoId = req.query.id;
-  
   if (!videoId) {
     return res.status(400).send("Video ID is required");
   }
   const audioOutput = `${videoId}.mp3`;
   const videoURL = `https://www.youtube.com/watch?v=${videoId}`;
 
-
   try {
-    
     ytdl(videoURL, { quality: "highestaudio" })
       .pipe(fs.createWriteStream(audioOutput))
       .on("finish", () => {
@@ -106,47 +93,44 @@ app.get("/downloadAudio", async (req, res) => {
         fileStream
           .pipe(res)
           .on("finish", () => {
-            console.log("file sent successfully!!!");
-
+            console.log("File sent successfully!");
             fs.unlink(audioOutput, () => {});
           })
           .on("error", (err) => {
-            console.log(err);
+            console.error("Error sending file:", err);
           });
       })
       .on("error", (error) => {
-        console.log(error);
-        return res.status(400).send("Unable to download audio");
+        console.error("Error downloading audio:", error);
+        res.status(400).send("Unable to download audio");
       });
   } catch (error) {
-    console.log(error);
+    console.error("Error during download:", error);
+    res.status(400).send("Error when downloading");
   }
 });
-app.get("/getVideoDetails", async (req,res)=>{
+
+app.get("/getVideoDetails", async (req, res) => {
   const videoId = req.query.id;
-  
   if (!videoId) {
     return res.status(400).send("Video ID is required");
   }
   const videoURL = `https://www.youtube.com/watch?v=${videoId}`;
-  try{
-    ytdl.getBasicInfo(videoURL).then((info)=>{
-      console.log(info.videoDetails.title)
-      //deprecation warning
-      console.log(info.videoDetails.thumbnail.thumbnails[info.videoDetails.thumbnail.thumbnails.length-2]);
-      const title = info.videoDetails.title;
-      const thumbnail = info.videoDetails.thumbnail.thumbnails[info.videoDetails.thumbnail.thumbnails.length-2];
-      res.json({
-        title:title,
-        thumbnail:thumbnail
-      })
-    });
-  }catch(error){
-    console.log(error)
-  }
   
-})
+  try {
+    const info = await ytdl.getBasicInfo(videoURL);
+    const title = info.videoDetails.title;
+    const thumbnail = info.videoDetails.thumbnail.thumbnails[info.videoDetails.thumbnail.thumbnails.length-2];
+    res.json({
+      title: title,
+      thumbnail: thumbnail
+    });
+  } catch (error) {
+    console.error("Error fetching video details:", error);
+    res.status(400).send("Error fetching video details");
+  }
+});
 
 app.listen(port, () => {
-  console.log(`http:localhost:${port}`);
+  console.log(`Server running at http://localhost:${port}`);
 });
