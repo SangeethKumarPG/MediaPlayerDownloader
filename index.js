@@ -3,9 +3,18 @@ const ytdl = require("@distube/ytdl-core");
 const fs = require("fs");
 const { exec } = require("child_process");
 const path = require("path");
+const cors = require('cors');
 
 const app = express();
 const port = 3000;
+
+const corsOptions = {
+  origin: 'https://mediaplayerfrontend2.onrender.com',
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type'],
+};
+
+app.use(cors(corsOptions));
 
 app.get("/downloadVideo", async (req, res) => {
   const videoId = req.query.id;
@@ -20,32 +29,24 @@ app.get("/downloadVideo", async (req, res) => {
     ytdl(videoURL, { quality: "highestvideo" })
       .pipe(fs.createWriteStream(videoOutput))
       .on("finish", () => {
-        console.log("Video download complete!");
         ytdl(videoURL, { quality: "highestaudio" })
           .pipe(fs.createWriteStream(audioOutput))
           .on("finish", () => {
-            console.log("Audio download complete");
             exec(
               `ffmpeg -i ${videoOutput} -i ${audioOutput} -c copy ${finalOutput}`,
               (err) => {
                 if (err) {
-                  console.error("Error merging video and audio:", err);
-                  return res
-                    .status(500)
-                    .send("Unable to merge audio and video");
+                  return res.status(500).send("Unable to merge audio and video");
                 }
-                console.log("Merge complete");
                 const fileStream = fs.createReadStream(finalOutput);
                 res.setHeader(
                   "Content-Disposition",
                   `attachment; filename=${path.basename(finalOutput)}`
                 );
                 res.setHeader("Content-Type", "video/mp4");
-
                 fileStream
                   .pipe(res)
                   .on("finish", () => {
-                    console.log("File sent successfully!");
                     fs.unlink(videoOutput, () => {});
                     fs.unlink(audioOutput, () => {});
                     fs.unlink(finalOutput, () => {});
@@ -57,16 +58,13 @@ app.get("/downloadVideo", async (req, res) => {
             );
           })
           .on("error", (error) => {
-            console.error("Error downloading audio:", error);
             res.status(400).send("Unable to download audio");
           });
       })
       .on("error", (error) => {
-        console.error("Error downloading video:", error);
         res.status(400).send("Video download error");
       });
   } catch (error) {
-    console.error("Error during download:", error);
     res.status(400).send("Error when downloading");
   }
 });
@@ -78,12 +76,10 @@ app.get("/downloadAudio", async (req, res) => {
   }
   const audioOutput = `${videoId}.mp3`;
   const videoURL = `https://www.youtube.com/watch?v=${videoId}`;
-
   try {
     ytdl(videoURL, { quality: "highestaudio" })
       .pipe(fs.createWriteStream(audioOutput))
       .on("finish", () => {
-        console.log("Audio download completed");
         const fileStream = fs.createReadStream(audioOutput);
         res.setHeader(
           "Content-Disposition",
@@ -93,7 +89,6 @@ app.get("/downloadAudio", async (req, res) => {
         fileStream
           .pipe(res)
           .on("finish", () => {
-            console.log("File sent successfully!");
             fs.unlink(audioOutput, () => {});
           })
           .on("error", (err) => {
@@ -101,11 +96,9 @@ app.get("/downloadAudio", async (req, res) => {
           });
       })
       .on("error", (error) => {
-        console.error("Error downloading audio:", error);
         res.status(400).send("Unable to download audio");
       });
   } catch (error) {
-    console.error("Error during download:", error);
     res.status(400).send("Error when downloading");
   }
 });
@@ -116,7 +109,6 @@ app.get("/getVideoDetails", async (req, res) => {
     return res.status(400).send("Video ID is required");
   }
   const videoURL = `https://www.youtube.com/watch?v=${videoId}`;
-  
   try {
     const info = await ytdl.getBasicInfo(videoURL);
     const title = info.videoDetails.title;
@@ -126,7 +118,6 @@ app.get("/getVideoDetails", async (req, res) => {
       thumbnail: thumbnail
     });
   } catch (error) {
-    console.error("Error fetching video details:", error);
     res.status(400).send("Error fetching video details");
   }
 });
